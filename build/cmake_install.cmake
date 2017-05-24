@@ -1,4 +1,4 @@
-# Install script for directory: /home/anthony/Desktop/p10-model-predictive-control
+# Install script for directory: /home/anthony/Desktop/sdc-p10-mpc-linux
 
 # Set the install prefix
 if(NOT DEFINED CMAKE_INSTALL_PREFIX)
@@ -40,5 +40,5 @@ endif()
 
 string(REPLACE ";" "\n" CMAKE_INSTALL_MANIFEST_CONTENT
        "${CMAKE_INSTALL_MANIFEST_FILES}")
-file(WRITE "/home/anthony/Desktop/p10-model-predictive-control/build/${CMAKE_INSTALL_MANIFEST}"
+file(WRITE "/home/anthony/Desktop/sdc-p10-mpc-linux/build/${CMAKE_INSTALL_MANIFEST}"
      "${CMAKE_INSTALL_MANIFEST_CONTENT}")

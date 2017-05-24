@@ -4,15 +4,15 @@ set(CMAKE_DEPENDS_LANGUAGES
   )
 # The set of files for implicit dependencies of each language:
 set(CMAKE_DEPENDS_CHECK_CXX
-  "/home/anthony/Desktop/p10-model-predictive-control/src/MPC.cpp" "/home/anthony/Desktop/p10-model-predictive-control/build/CMakeFiles/mpc.dir/src/MPC.cpp.o"
-  "/home/anthony/Desktop/p10-model-predictive-control/src/main.cpp" "/home/anthony/Desktop/p10-model-predictive-control/build/CMakeFiles/mpc.dir/src/main.cpp.o"
+  "/home/anthony/Desktop/sdc-p10-mpc-linux/src/MPC.cpp" "/home/anthony/Desktop/sdc-p10-mpc-linux/build/CMakeFiles/mpc.dir/src/MPC.cpp.o"
+  "/home/anthony/Desktop/sdc-p10-mpc-linux/src/main.cpp" "/home/anthony/Desktop/sdc-p10-mpc-linux/build/CMakeFiles/mpc.dir/src/main.cpp.o"
   )
 set(CMAKE_CXX_COMPILER_ID "GNU")
 
 # The include file search paths:
 set(CMAKE_CXX_TARGET_INCLUDE_PATH
   "/usr/local/include"
-  "../src/uWS/openssl"
+  "/home/anthony/Desktop/p10-model-predictive-control/src/uWS/openssl"
   "../src/Eigen-3.3"
   )
 
