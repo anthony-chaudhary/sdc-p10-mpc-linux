@@ -70,7 +70,10 @@ Eigen::VectorXd polyfit(Eigen::VectorXd xvals, Eigen::VectorXd yvals,
 int main() {
   uWS::Hub h;
 
-  // MPC is initialized here!
+
+  /****************************************
+   * 1. Initialize mpc class
+   ****************************************/
   MPC mpc;
 
   h.onMessage([&mpc](uWS::WebSocket<uWS::SERVER> *ws, char *data, size_t length,
@@ -91,11 +94,10 @@ int main() {
         if (event == "telemetry") {
           // j[1] is the data JSON object
 
+
           /****************************************
-           * 1. Collect data.
+           * 2. Collect data from simulator
            ****************************************/
-          // where px = point x car space
-          // ptsx = point x map space
 
           vector<double> ptsx = j[1]["ptsx"];
           vector<double> ptsy = j[1]["ptsy"];
@@ -107,88 +109,95 @@ int main() {
           double steer_value = j[1]["steering_angle"] ;
 
           /****************************************
-           * 2. Convert to car space 
+           * 3. Convert map space to car space 
            ****************************************/
 
-          // From Kasper Sakmann on slack -> positive angles are negative from above in Sim
-          // Some negatives here and below to deal with that
-
           // Use Eigen vector as polyfit() requires it
-
           Eigen::VectorXd   x_car_space = Eigen::VectorXd( ptsx.size() ) ;
           Eigen::VectorXd   y_car_space = Eigen::VectorXd( ptsx.size() ) ;
 
           for (int i = 0;   i < ptsx.size() ;   i++) {
             x_car_space(i) = (ptsx[i] - px) * cos(psi) + (ptsy[i] - py) * sin(psi)  ;
-            y_car_space(i) = (ptsx[i] - px) * cos(psi) - (ptsy[i] - py) * sin(psi)  ;
+            y_car_space(i) = (ptsy[i] - py) * cos(psi) - (ptsx[i] - px) * sin(psi)  ;
+            //cout << "ptsx[i] " << ptsx[i] << "\tpx " << px << "\tcos(psi) " 
+            //<< cos(psi) << "\tsin(psi) " << sin(psi) << endl ;
           }
 
           /****************************************
-           * 3. Fit line
+           * 4. Fit line to get coefficients
            ****************************************/
 
           auto coeffs = polyfit(x_car_space, y_car_space, 3) ;
           cout << "coeffs\t" << coeffs << endl ;
 
            /****************************************
-           * 4. Error calculation (Cross track and Psi)
+           * 5. Error calculation (Cross track and Psi) and state definition.
            ****************************************/
           
           Eigen::VectorXd state(6) ;
-          // v * latency
-          px = v * .1 ;
+        
+          // where * latency is used to allow for latency in state calculation
+          const double latency = .1 ;
+          cout << "px original " << px << endl ;
+          px = v * latency ;
+          cout << "px transformed" << px << endl ;
+
           const double Lf = 2.67;
           cout << "psi original" << psi << endl ;
-          psi = - v * steer_value / Lf * .1 ;
+          psi = - v * steer_value / Lf * latency ;
           cout << "psi transformed" << psi << endl ;
 
-          double cte  = polyeval(coeffs, px) - 0 ;
-          double epsi = psi - atan( coeffs[1] + 
-                              2 * px * coeffs[2] + 
-                              3 * px * px * coeffs[3] ) ;
+          double cte  = polyeval(coeffs, px) ;
+          double epsi = atan( coeffs[1] ) ;
+
           state << px, 0, psi, v, cte, epsi ;
+          cout << "state " << psi << endl ;
 
           /****************************************
-           * 5. Solve
+           * 6. Solve (Computational Infastructure for Operations Research library)
            ****************************************/
 
           cout << "Solving" << endl ;
 
           auto vars = mpc.Solve(state, coeffs) ;
-          steer_value    = vars[0];
-          double throttle_value = vars[1];
+
+          steer_value           = - mpc.steering_angle ;
+          double throttle_value = - mpc.throttle ;
 
           /****************************************
-           * 6. Pass output to simulator
+           * 7. Pass output to simulator
            ****************************************/
 
           json msgJson;
-          msgJson["steering_angle"] = - steer_value;
+          msgJson["steering_angle"] =   steer_value;
           msgJson["throttle"]       =   throttle_value;
 
           /****************************************
-           * 7. Visuals for simulator
+           * 8. Predicted line visual for simulator
            ****************************************/
 
-          //Display the MPC predicted trajectory 
+          // the points in the simulator are connected by a Green line
+          // points are in reference to the vehicle's coordinate system
+          
           vector<double> mpc_x_vals;
           vector<double> mpc_y_vals;
 
-          //.. add (x,y) points to list here, points are in reference to the vehicle's coordinate system
-          // the points in the simulator are connected by a Green line
-
-          int N = 30 ;
-          for (int i = 0; i < N; i ++) {
-
-            mpc_x_vals.push_back(vars[ 2 + i] ) ;
-            mpc_y_vals.push_back(vars[ 2 + N + i] ) ;
+          int x_car_space_len = x_car_space.size() ;
+          for (int i = 0; i < x_car_space_len; i ++) {
+            mpc_x_vals.push_back( x_car_space[i])  ;
+            mpc_y_vals.push_back(polyeval(coeffs, x_car_space[i]) ) ;
           }
-
 
           msgJson["mpc_x"] = mpc_x_vals;
           msgJson["mpc_y"] = mpc_y_vals;
 
-          //Display the waypoints/reference line
+
+          /****************************************
+           * 9. Way point visual for simulator
+           ****************************************/
+
+          // the points in the simulator are connected by a Yellow line
+
           vector<double> next_x_vals;
           vector<double> next_y_vals;
 
@@ -197,14 +206,16 @@ int main() {
             next_y_vals.push_back(y_car_space[i] ) ;
           }
 
-          //.. add (x,y) points to list here, points are in reference to the vehicle's coordinate system
-          // the points in the simulator are connected by a Yellow line
-
           msgJson["next_x"] = next_x_vals;
           msgJson["next_y"] = next_y_vals;
 
+
           auto msg = "42[\"steer\"," + msgJson.dump() + "]";
           std::cout << msg << std::endl;
+
+          /****************************************
+           * 10. Add latency to mimic real world driving conditions
+           ****************************************/
 
           // Latency
           // The purpose is to mimic real driving conditions where
@@ -219,6 +230,7 @@ int main() {
           // TODO look at chrono::high_resolution_clock() 
           this_thread::sleep_for(chrono::milliseconds(100));
           (*ws).send(msg.data(), msg.length(), uWS::OpCode::TEXT);
+
         }
       } else {
         // Manual driving

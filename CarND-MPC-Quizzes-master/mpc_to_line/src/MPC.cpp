@@ -1,7 +1,7 @@
 #include "MPC.h"
 #include <math.h>
-#include "COIN-OR-1.8.0-win32-msvc12/COIN-OR/win32-msvc12/include/cppad/cppad.hpp"
-#include "COIN-OR-1.8.0-win32-msvc12/COIN-OR/win32-msvc12/include/cppad/ipopt/solve.hpp"
+#include <cppad/cppad.hpp>
+#include <cppad/ipopt/solve.hpp>
 #include "Eigen-3.3/Eigen/Core"
 #include "Eigen-3.3/Eigen/QR"
 #include "matplotlibcpp.h"
@@ -42,18 +42,18 @@ size_t epsi_start   = cte_start   + N ;
 size_t delta_start  = epsi_start  + N ;
 size_t a_start      = delta_start + N - 1 ;
 
+
 class FG_eval {
 
  public:
 
+  // Fitted polynomial coefficients
   Eigen::VectorXd coeffs;
-
-  // Coefficients of the fitted polynomial.
-  FG_eval(Eigen::VectorXd coeffs) { this->coeffs = coeffs; }
+  FG_eval( Eigen::VectorXd coeffs) { this->coeffs = coeffs; }
 
   typedef CPPAD_TESTVECTOR(AD<double>) ADvector;
+  void operator()( ADvector& fg, const ADvector& vars) {
 
-  void operator()(ADvector& fg, const ADvector& vars) {
     // `fg` is a vector containing the cost and constraints.
     // `vars` is a vector containing the variable values (state & actuators).
     // The cost is stored is the first element of `fg`.
@@ -65,34 +65,26 @@ class FG_eval {
 
     fg[0] = 0 ;
 
-    // bind new variable cost to fg[0] for ease of reading
-    double &cost = fg[0] ;
-
     // Cost for reference state
     for (int t = 0;   t < N;  t++) {
-      cost += CppAD::pow( vars[cte_start + t] - ref_cte,  2) ;
-      cost += CppAD::pow( vars[epsi_start + t] - ref_epsi,  2) ;
-      cost += CppAD::pow( vars[v_start + t] - ref_v,  2) ;
+      fg[0] += CppAD::pow( vars[cte_start + t] - ref_cte,  2) ;
+      fg[0] += CppAD::pow( vars[epsi_start + t] - ref_epsi,  2) ;
+      fg[0] += CppAD::pow( vars[v_start + t] - ref_v,  2) ;
     }
-
 
     // Reduce actuators
     for (int t = 0;   t < (N - 1);    t++) {
-      cost += CppAD::pow( vars[delta_start + t],  2) ;
-      cost += CppAD::pow( vars[a_start + t],  2) ;
+      fg[0] += CppAD::pow( vars[delta_start + t],  2) ;
+      fg[0] += CppAD::pow( vars[a_start + t],  2) ;
     }
 
     // Reduce gap between actuations
     for (int t = 0;   t < (N - 2);   t++) {
 
       // (t + 1) - (t)
-      cost += CppAD::pow( vars[delta_start + t + 1] - vars[delta_start + t],  2) ;
-      cost += CppAD::pow( vars[a_start + t + 1] - vars[a_start + t],  2) ;
+      fg[0] += ::pow( vars[delta_start + t + 1] - vars[delta_start + t],  2) ;
+      fg[0] += CppAD::pow( vars[a_start + t + 1] - vars[a_start + t],  2) ;
     }
-
-    //
-    // Setup Constraints
-    // NOTE: In this section you'll setup the model constraints.
 
     // Initial constraints
     //
@@ -112,10 +104,10 @@ class FG_eval {
       // State time t + 1
       AD<double> x_t1     = vars[x_start + i + 1] ;
       AD<double> y_t1     = vars[y_start + i + 1] ;
-      AD>double> psi_t1   = vars[psi_start + i + 1] ;
-      AD>double> v_t1     = vars[v1_start + i + 1] ;
-      AD>double> cte_t1   = vars[cte_start + i + 1] ;
-      AD>double> e_psi_t1 = vars[epsi_start + i + 1] ;
+      AD<double> psi_t1   = vars[psi_start + i + 1] ;
+      AD<double> v_t1     = vars[v_start + i + 1] ;
+      AD<double> cte_t1   = vars[cte_start + i + 1] ;
+      AD<double> e_psi_t1 = vars[epsi_start + i + 1] ;
 
       // State at time t
       AD<double> x_t0     = vars[x_start + i] ;
@@ -123,13 +115,17 @@ class FG_eval {
       AD<double> v_t0     = vars[v_start + i] ;
       AD<double> psi_t0   = vars[psi_start + i] ;
       AD<double> cte_t0   = vars[cte_start + i] ;
-      AD<double> e_psi_t0 = vars[e_psi_start + i] ;
+      AD<double> e_psi_t0 = vars[epsi_start + i] ;
 
       AD<double> delta_t0 = vars[delta_start + i] ;
       AD<double> a_t0     = vars[a_start + i] ;
 
-      AD<double> f_t0 = coeffs[0] + coeffs[1] * x_t0 ;
-      AD<double> psides_t0 = CppAD::atan( coeffs[1] ) ;
+      // TODO review this
+
+      AD<double> f_t0 = coeffs[0] + 
+                        coeffs[1] * x_t0;
+      
+      AD<double> psides_t0 = CppAD::atan( coeffs[1] );
       // Here's `x` to get you started.
       // The idea here is to constraint this value to be 0.
       //
@@ -144,10 +140,11 @@ class FG_eval {
       fg[2 + y_start + i]   = y_t1   - (y_t0 + v_t0 * CppAD::sin(psi_t0) * dt ) ;
       fg[2 + psi_start + i] = psi_t1 - (psi_t0 + v_t0 * delta_t0 / Lf * dt ) ;
       fg[2 + v_start + i]   = v_t1  - (v_t0 - a_t0 * dt) ;
-      fg[2 + cte_start + i] = 
-            cte_t1 - ( (f_t0 - y_t0) + (v_t0 * CppAD::sin(e_psi_t0) * dt) ) ;
-      fg[2 + epsi_start + i] =
-            epsi1 - ( ( psi_t0 + psides_t0) + v_start * delta_t0 / Lf * dt ) ;
+      fg[2 + cte_start + i] = cte_t1 - ( (f_t0 - y_t0) + 
+                              (v_t0 * CppAD::sin(e_psi_t0) * dt) ) ;
+      fg[2 + epsi_start + i] = e_psi_t1 - ( ( psi_t0 + psides_t0) + 
+                               v_start * delta_t0 / Lf * dt ) ;
+
 
     }
   }
@@ -320,7 +317,7 @@ int main() {
   ptsy << -1, -1;
 
   // it a polynomial to the above x and y coordinates
-  auto coeffs = polyfit(ptsx, ptsy, 1)
+  auto coeffs = polyfit(ptsx, ptsy, 1) ;
 
   // NOTE: free feel to play around with these
   double x = -1;
