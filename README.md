@@ -5,7 +5,7 @@
 
 #### A MPC optimizes the current controls while keeping future information in mind.
 
-![Video available here.](videos/sdc-mpc-run)
+![Video available here.](videos/sdc-mpc-run.mkv)
 
 
 ## Overview
@@ -245,7 +245,7 @@ Steps 6 is the key step that kicks off the above described MPC process.
 
 
 Example output from console
-![Example output from console](images/console-example.png)
+![Example output from console](images/console-output.png)
 
 
 ### Comparison to PID controller
